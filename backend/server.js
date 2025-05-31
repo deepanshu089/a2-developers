@@ -14,12 +14,12 @@ console.log('Environment:', {
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: ['https://a2-developers.vercel.app', 'http://localhost:5173'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Length', 'X-Requested-With']
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 console.log('CORS Options:', corsOptions);

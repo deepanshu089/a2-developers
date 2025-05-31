@@ -16,17 +16,13 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
     setError("");
     setSuccess("");
     try {
-      // Log the environment variable
-      console.log('Environment:', import.meta.env);
-      console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
+      const apiUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
+      const endpoint = `${apiUrl}/api/book-demo`;
       
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const fullUrl = `${apiUrl}/api/book-demo`;
-      
-      console.log('Full API URL:', fullUrl);
+      console.log('API URL:', endpoint);
       console.log('Form data:', form);
 
-      const res = await fetch(fullUrl, {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json"
@@ -35,7 +31,6 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
       });
 
       console.log('Response status:', res.status);
-      console.log('Response headers:', Object.fromEntries(res.headers.entries()));
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
