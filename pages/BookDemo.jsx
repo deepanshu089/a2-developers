@@ -16,11 +16,17 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
     setError("");
     setSuccess("");
     try {
+      // Log the environment variable
+      console.log('Environment:', import.meta.env);
+      console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
+      
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      console.log('Submitting to:', `${apiUrl}/api/book-demo`);
+      const fullUrl = `${apiUrl}/api/book-demo`;
+      
+      console.log('Full API URL:', fullUrl);
       console.log('Form data:', form);
 
-      const res = await fetch(`${apiUrl}/api/book-demo`, {
+      const res = await fetch(fullUrl, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json"
@@ -28,13 +34,17 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
         body: JSON.stringify(form),
       });
 
+      console.log('Response status:', res.status);
+      console.log('Response headers:', Object.fromEntries(res.headers.entries()));
+
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
+        console.error('Error response:', errorData);
         throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
       }
 
       const data = await res.json();
-      console.log('Response:', data);
+      console.log('Success response:', data);
 
       setSuccess("Thank you! We'll be in touch soon.");
       setForm({ name: "", email: "", company: "", message: "" });

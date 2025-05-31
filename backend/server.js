@@ -5,6 +5,13 @@ require('dotenv').config();
 
 const app = express();
 
+// Log environment variables (excluding sensitive data)
+console.log('Environment:', {
+  NODE_ENV: process.env.NODE_ENV,
+  FRONTEND_URL: process.env.FRONTEND_URL,
+  MONGODB_CONNECTED: false // Will be updated after connection
+});
+
 // CORS configuration
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
@@ -15,8 +22,20 @@ const corsOptions = {
   exposedHeaders: ['Content-Length', 'X-Requested-With']
 };
 
+console.log('CORS Options:', corsOptions);
+
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log('Body:', req.body);
+  }
+  next();
+});
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
@@ -24,6 +43,11 @@ mongoose.connect(process.env.MONGO_URI, {
   useUnifiedTopology: true,
 }).then(() => {
   console.log('Connected to MongoDB');
+  console.log('Environment:', {
+    NODE_ENV: process.env.NODE_ENV,
+    FRONTEND_URL: process.env.FRONTEND_URL,
+    MONGODB_CONNECTED: true
+  });
 }).catch((err) => {
   console.error('MongoDB connection error:', err);
 });
@@ -49,6 +73,7 @@ app.get('/', (req, res) => {
       version: '1.0.0',
       status: 'active',
       timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
       endpoints: {
         root: '/',
         health: '/api/health',
@@ -80,12 +105,18 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.post('/api/book-demo', async (req, res) => {
   try {
+    console.log('Received demo request:', req.body);
     const { name, email, company, message } = req.body;
+    
     if (!name || !email) {
+      console.log('Validation failed: missing required fields');
       return res.status(400).json({ error: 'Name and email are required' });
     }
+
     const demo = new Demo({ name, email, company, message });
     await demo.save();
+    console.log('Demo saved successfully:', demo);
+    
     res.status(201).json({ 
       message: 'Demo booked successfully!',
       demo: {
@@ -130,6 +161,7 @@ app.use((err, req, res, next) => {
 
 // 404 handler
 app.use((req, res) => {
+  console.log('404 Not Found:', req.url);
   res.status(404).json({ error: 'Not found' });
 });
 
