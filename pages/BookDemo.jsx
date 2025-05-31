@@ -8,6 +8,8 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    // Clear error when user starts typing
+    if (error) setError("");
   };
 
   const handleSubmit = async (e) => {
@@ -15,6 +17,19 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
     setLoading(true);
     setError("");
     setSuccess("");
+
+    // Basic validation
+    if (!form.name.trim()) {
+      setError("Name is required");
+      setLoading(false);
+      return;
+    }
+    if (!form.email.trim()) {
+      setError("Email is required");
+      setLoading(false);
+      return;
+    }
+
     try {
       const apiUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
       const endpoint = `${apiUrl}/api/book-demo`;
@@ -31,16 +46,14 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
       });
 
       console.log('Response status:', res.status);
+      const data = await res.json();
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        console.error('Error response:', errorData);
-        throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
+        console.error('Error response:', data);
+        throw new Error(data.error || `HTTP error! status: ${res.status}`);
       }
 
-      const data = await res.json();
       console.log('Success response:', data);
-
       setSuccess("Thank you! We'll be in touch soon.");
       setForm({ name: "", email: "", company: "", message: "" });
     } catch (err) {

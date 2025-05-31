@@ -113,6 +113,19 @@ app.post('/api/book-demo', async (req, res) => {
       return res.status(400).json({ error: 'Name and email are required' });
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log('Validation failed: invalid email format');
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Check MongoDB connection
+    if (mongoose.connection.readyState !== 1) {
+      console.error('MongoDB not connected');
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+
     const demo = new Demo({ name, email, company, message });
     await demo.save();
     console.log('Demo saved successfully:', demo);
@@ -129,7 +142,17 @@ app.post('/api/book-demo', async (req, res) => {
     });
   } catch (error) {
     console.error('Error booking demo:', error);
-    res.status(500).json({ error: 'Failed to book demo' });
+    // Send more specific error message
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: 'Invalid data provided' });
+    }
+    if (error.name === 'MongoError' && error.code === 11000) {
+      return res.status(400).json({ error: 'A demo request with this email already exists' });
+    }
+    res.status(500).json({ 
+      error: 'Failed to book demo',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
