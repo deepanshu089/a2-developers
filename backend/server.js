@@ -28,13 +28,31 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // MongoDB connection with retry logic
+let isConnecting = false;
+let connectionAttempts = 0;
+const MAX_RETRIES = 5;
+
 const connectDB = async () => {
+  if (isConnecting) {
+    console.log('Connection attempt already in progress...');
+    return;
+  }
+
+  if (connectionAttempts >= MAX_RETRIES) {
+    console.error('Max connection attempts reached');
+    return;
+  }
+
   try {
+    isConnecting = true;
+    connectionAttempts++;
+
     if (!process.env.MONGO_URI) {
       console.error('MONGO_URI is missing in environment variables');
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
+    console.log(`Connection attempt ${connectionAttempts} of ${MAX_RETRIES}`);
     console.log('Environment check:', {
       NODE_ENV: process.env.NODE_ENV,
       MONGO_URI_EXISTS: !!process.env.MONGO_URI,
@@ -42,17 +60,27 @@ const connectDB = async () => {
       MONGO_URI_START: process.env.MONGO_URI.substring(0, 20) + '...',
     });
 
-    console.log('Attempting to connect to MongoDB...');
-    
+    // Close existing connection if any
+    if (mongoose.connection.readyState !== 0) {
+      console.log('Closing existing connection...');
+      await mongoose.connection.close();
+    }
+
     const options = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
-      family: 4 // Force IPv4
+      family: 4, // Force IPv4
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      retryWrites: true,
+      retryReads: true
     };
 
+    console.log('Attempting to connect to MongoDB...');
     await mongoose.connect(process.env.MONGO_URI, options);
+    
     console.log('MongoDB connected successfully');
     console.log('Connection state:', mongoose.connection.readyState);
     console.log('Environment:', {
@@ -61,6 +89,9 @@ const connectDB = async () => {
       MONGODB_CONNECTED: true,
       DB_NAME: mongoose.connection.name
     });
+
+    // Reset connection attempts on successful connection
+    connectionAttempts = 0;
   } catch (error) {
     console.error('MongoDB connection error details:', {
       name: error.name,
@@ -68,9 +99,16 @@ const connectDB = async () => {
       code: error.code,
       stack: error.stack
     });
-    // Retry connection after 5 seconds
-    console.log('Retrying connection in 5 seconds...');
-    setTimeout(connectDB, 5000);
+
+    if (connectionAttempts < MAX_RETRIES) {
+      const delay = Math.min(1000 * Math.pow(2, connectionAttempts), 30000);
+      console.log(`Retrying connection in ${delay/1000} seconds... (Attempt ${connectionAttempts + 1}/${MAX_RETRIES})`);
+      setTimeout(connectDB, delay);
+    } else {
+      console.error('Max connection attempts reached. Please check your MongoDB configuration.');
+    }
+  } finally {
+    isConnecting = false;
   }
 };
 
@@ -84,16 +122,23 @@ mongoose.connection.on('error', (err) => {
     message: err.message,
     code: err.code
   });
+  // Attempt to reconnect on error
+  if (!isConnecting) {
+    connectDB();
+  }
 });
 
 mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected. Current state:', mongoose.connection.readyState);
-  console.log('Attempting to reconnect...');
-  connectDB();
+  // Attempt to reconnect on disconnect
+  if (!isConnecting) {
+    connectDB();
+  }
 });
 
 mongoose.connection.on('reconnected', () => {
   console.log('MongoDB reconnected. New state:', mongoose.connection.readyState);
+  connectionAttempts = 0;
 });
 
 // Request logging middleware
@@ -141,19 +186,24 @@ app.get('/', (req, res) => {
   }
 });
 
-// Health check endpoint
+// Health check endpoint with detailed status
 app.get('/api/health', (req, res) => {
-  try {
-    res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-      environment: process.env.NODE_ENV || 'development'
-    });
-  } catch (error) {
-    console.error('Error in health check:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const mongoState = mongoose.connection.readyState;
+  const mongoStatus = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  }[mongoState] || 'unknown';
+
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    mongodb: mongoStatus,
+    environment: process.env.NODE_ENV || 'development',
+    connectionAttempts,
+    isConnecting
+  });
 });
 
 // API Routes
