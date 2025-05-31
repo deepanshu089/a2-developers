@@ -17,17 +17,31 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
     setSuccess("");
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      console.log('Submitting to:', `${apiUrl}/api/book-demo`);
+      console.log('Form data:', form);
+
       const res = await fetch(`${apiUrl}/api/book-demo`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        credentials: "include",
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error("Failed to submit");
+
+      const data = await res.json();
+      console.log('Response:', data);
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to submit");
+      }
+
       setSuccess("Thank you! We'll be in touch soon.");
       setForm({ name: "", email: "", company: "", message: "" });
     } catch (err) {
       console.error('Submission error:', err);
-      setError("Submission failed. Please try again.");
+      setError(err.message || "Submission failed. Please try again.");
     } finally {
       setLoading(false);
     }
