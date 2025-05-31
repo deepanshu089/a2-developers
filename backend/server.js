@@ -9,7 +9,8 @@ const app = express();
 console.log('Environment:', {
   NODE_ENV: process.env.NODE_ENV,
   FRONTEND_URL: process.env.FRONTEND_URL,
-  MONGODB_CONNECTED: false
+  MONGODB_CONNECTED: false,
+  VERCEL: process.env.VERCEL ? 'true' : 'false'
 });
 
 // CORS configuration
@@ -58,6 +59,7 @@ const connectDB = async () => {
       MONGO_URI_EXISTS: !!process.env.MONGO_URI,
       MONGO_URI_LENGTH: process.env.MONGO_URI.length,
       MONGO_URI_START: process.env.MONGO_URI.substring(0, 20) + '...',
+      VERCEL: process.env.VERCEL ? 'true' : 'false'
     });
 
     // Close existing connection if any
@@ -75,7 +77,10 @@ const connectDB = async () => {
       maxPoolSize: 10,
       minPoolSize: 5,
       retryWrites: true,
-      retryReads: true
+      retryReads: true,
+      // Add these options for serverless
+      keepAlive: true,
+      keepAliveInitialDelay: 300000
     };
 
     console.log('Attempting to connect to MongoDB...');
@@ -87,7 +92,8 @@ const connectDB = async () => {
       NODE_ENV: process.env.NODE_ENV,
       FRONTEND_URL: process.env.FRONTEND_URL,
       MONGODB_CONNECTED: true,
-      DB_NAME: mongoose.connection.name
+      DB_NAME: mongoose.connection.name,
+      VERCEL: process.env.VERCEL ? 'true' : 'false'
     });
 
     // Reset connection attempts on successful connection
@@ -202,7 +208,8 @@ app.get('/api/health', (req, res) => {
     mongodb: mongoStatus,
     environment: process.env.NODE_ENV || 'development',
     connectionAttempts,
-    isConnecting
+    isConnecting,
+    vercel: process.env.VERCEL ? 'true' : 'false'
   });
 });
 
