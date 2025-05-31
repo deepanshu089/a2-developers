@@ -23,19 +23,18 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
       const res = await fetch(`${apiUrl}/api/book-demo`, {
         method: "POST",
         headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json"
+          "Content-Type": "application/json"
         },
-        credentials: "include",
         body: JSON.stringify(form),
       });
 
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
       console.log('Response:', data);
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to submit");
-      }
 
       setSuccess("Thank you! We'll be in touch soon.");
       setForm({ name: "", email: "", company: "", message: "" });
