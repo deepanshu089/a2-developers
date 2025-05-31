@@ -9,7 +9,7 @@ const app = express();
 console.log('Environment:', {
   NODE_ENV: process.env.NODE_ENV,
   FRONTEND_URL: process.env.FRONTEND_URL,
-  MONGODB_CONNECTED: false // Will be updated after connection
+  MONGODB_CONNECTED: false
 });
 
 // CORS configuration
@@ -27,6 +27,75 @@ console.log('CORS Options:', corsOptions);
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// MongoDB connection with retry logic
+const connectDB = async () => {
+  try {
+    if (!process.env.MONGO_URI) {
+      console.error('MONGO_URI is missing in environment variables');
+      throw new Error('MONGO_URI is not defined in environment variables');
+    }
+
+    console.log('Environment check:', {
+      NODE_ENV: process.env.NODE_ENV,
+      MONGO_URI_EXISTS: !!process.env.MONGO_URI,
+      MONGO_URI_LENGTH: process.env.MONGO_URI.length,
+      MONGO_URI_START: process.env.MONGO_URI.substring(0, 20) + '...',
+    });
+
+    console.log('Attempting to connect to MongoDB...');
+    
+    const options = {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4 // Force IPv4
+    };
+
+    await mongoose.connect(process.env.MONGO_URI, options);
+    console.log('MongoDB connected successfully');
+    console.log('Connection state:', mongoose.connection.readyState);
+    console.log('Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      FRONTEND_URL: process.env.FRONTEND_URL,
+      MONGODB_CONNECTED: true,
+      DB_NAME: mongoose.connection.name
+    });
+  } catch (error) {
+    console.error('MongoDB connection error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    // Retry connection after 5 seconds
+    console.log('Retrying connection in 5 seconds...');
+    setTimeout(connectDB, 5000);
+  }
+};
+
+// Initial connection
+connectDB();
+
+// Handle MongoDB connection events
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error event:', {
+    name: err.name,
+    message: err.message,
+    code: err.code
+  });
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected. Current state:', mongoose.connection.readyState);
+  console.log('Attempting to reconnect...');
+  connectDB();
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('MongoDB reconnected. New state:', mongoose.connection.readyState);
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
@@ -35,21 +104,6 @@ app.use((req, res, next) => {
     console.log('Body:', req.body);
   }
   next();
-});
-
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => {
-  console.log('Connected to MongoDB');
-  console.log('Environment:', {
-    NODE_ENV: process.env.NODE_ENV,
-    FRONTEND_URL: process.env.FRONTEND_URL,
-    MONGODB_CONNECTED: true
-  });
-}).catch((err) => {
-  console.error('MongoDB connection error:', err);
 });
 
 const demoSchema = new mongoose.Schema({
