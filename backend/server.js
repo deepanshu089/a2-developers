@@ -33,6 +33,16 @@ let isConnecting = false;
 let connectionAttempts = 0;
 const MAX_RETRIES = 5;
 
+const verifyMongoURI = (uri) => {
+  if (!uri) return false;
+  try {
+    // Check if it's a valid MongoDB URI format
+    return uri.startsWith('mongodb://') || uri.startsWith('mongodb+srv://');
+  } catch (error) {
+    return false;
+  }
+};
+
 const connectDB = async () => {
   if (isConnecting) {
     console.log('Connection attempt already in progress...');
@@ -53,10 +63,17 @@ const connectDB = async () => {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
+    // Verify MongoDB URI format
+    if (!verifyMongoURI(process.env.MONGO_URI)) {
+      console.error('Invalid MongoDB URI format');
+      throw new Error('Invalid MongoDB URI format');
+    }
+
     console.log(`Connection attempt ${connectionAttempts} of ${MAX_RETRIES}`);
     console.log('Environment check:', {
       NODE_ENV: process.env.NODE_ENV,
       MONGO_URI_EXISTS: !!process.env.MONGO_URI,
+      MONGO_URI_VALID: verifyMongoURI(process.env.MONGO_URI),
       MONGO_URI_LENGTH: process.env.MONGO_URI.length,
       MONGO_URI_START: process.env.MONGO_URI.substring(0, 20) + '...',
       VERCEL: process.env.VERCEL ? 'true' : 'false'
@@ -74,23 +91,23 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
       family: 4, // Force IPv4
-      maxPoolSize: 1, // Reduced for serverless
-      minPoolSize: 0, // Start with no connections
+      maxPoolSize: 10,
+      minPoolSize: 5,
       retryWrites: true,
       retryReads: true,
-      // Serverless-specific options
+      // Add these options for serverless
       keepAlive: true,
-      keepAliveInitialDelay: 300000,
-      // Add these options for better connection handling
-      connectTimeoutMS: 10000,
-      heartbeatFrequencyMS: 10000,
-      autoIndex: false, // Disable auto-indexing in production
-      maxIdleTimeMS: 60000 // Close idle connections after 1 minute
+      keepAliveInitialDelay: 300000
     };
 
     console.log('Attempting to connect to MongoDB...');
     await mongoose.connect(process.env.MONGO_URI, options);
     
+    // Verify connection
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error('MongoDB connection not established after connect');
+    }
+
     console.log('MongoDB connected successfully');
     console.log('Connection state:', mongoose.connection.readyState);
     console.log('Environment:', {
@@ -100,6 +117,15 @@ const connectDB = async () => {
       DB_NAME: mongoose.connection.name,
       VERCEL: process.env.VERCEL ? 'true' : 'false'
     });
+
+    // Test database access
+    try {
+      await mongoose.connection.db.admin().ping();
+      console.log('Database ping successful');
+    } catch (error) {
+      console.error('Database ping failed:', error);
+      throw new Error('Database ping failed');
+    }
 
     // Reset connection attempts on successful connection
     connectionAttempts = 0;
