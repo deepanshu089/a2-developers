@@ -74,13 +74,18 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
       family: 4, // Force IPv4
-      maxPoolSize: 10,
-      minPoolSize: 5,
+      maxPoolSize: 1, // Reduced for serverless
+      minPoolSize: 0, // Start with no connections
       retryWrites: true,
       retryReads: true,
-      // Add these options for serverless
+      // Serverless-specific options
       keepAlive: true,
-      keepAliveInitialDelay: 300000
+      keepAliveInitialDelay: 300000,
+      // Add these options for better connection handling
+      connectTimeoutMS: 10000,
+      heartbeatFrequencyMS: 10000,
+      autoIndex: false, // Disable auto-indexing in production
+      maxIdleTimeMS: 60000 // Close idle connections after 1 minute
     };
 
     console.log('Attempting to connect to MongoDB...');
