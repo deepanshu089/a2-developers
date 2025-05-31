@@ -16,7 +16,8 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
     setError("");
     setSuccess("");
     try {
-      const res = await fetch("/api/book-demo", {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${apiUrl}/api/book-demo`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -25,6 +26,7 @@ export default function BookDemo({ buttonOnly = false, className = "", isOpen = 
       setSuccess("Thank you! We'll be in touch soon.");
       setForm({ name: "", email: "", company: "", message: "" });
     } catch (err) {
+      console.error('Submission error:', err);
       setError("Submission failed. Please try again.");
     } finally {
       setLoading(false);
